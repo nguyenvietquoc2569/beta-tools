@@ -1,0 +1,63 @@
+def distributedTasks = [:]
+def version = '10.1.2'
+def projects = [:]
+def raw
+def baseSha = 'last-success-build'
+def target = 'origin/main'
+def configProjects = ['dns-vn', 'dns-us']
+
+stage("Build") {
+  jsTask {
+    // cleanWs()nx run services:build:production 
+    withCredentials([usernamePassword(credentialsId: "jenkins-new-beta", usernameVariable: "gitUsername", passwordVariable: "gitPassword")]){
+      checkout scm
+      sh script: "git pull https://${gitUsername}:${gitPassword}@github.com/nguyenvietquoc2569/beta-tools.git --tags"
+      sh script: "git fetch https://${gitUsername}:${gitPassword}@github.com/nguyenvietquoc2569/beta-tools.git --tags"
+      sh 'yarn install --frozen-lockfile'
+      // sh ''
+      // sh 'npm install'
+      raw = sh(script: "npx nx print-affected --base=${baseSha} --head=HEAD", returnStdout: true)
+      projects = readJSON(text: raw)['projects']
+      sh "echo ${projects}"
+      projects.eachWithIndex { project, i ->
+        if (fileExists("apps/${project}")) {
+          if (!(configProjects.contains(project))) {
+            sh "npx nx run ${project}:build --prod"
+          }
+          docker.build("nguyenvietquoc2569/betaschool-${project}:${version}", ". -f apps/${project}/Dockerfile")
+          sh "docker login -u nguyenvietquoc2569 -p Nvqlovepaq0708/"
+          sh "docker push nguyenvietquoc2569/betaschool-${project}:${version}"
+        }
+      }
+      sh script: "git checkout origin/main"
+      sh script: "git tag -f last-success-build"
+      sh script: "git push https://${gitUsername}:${gitPassword}@github.com/nguyenvietquoc2569/beta-tools.git --tags --force"
+    }
+    // sh 'npx nx run api:build --prod'
+    // sh 'npx nx run betaschool:build --prod'
+  }
+}
+
+// stage('Zip the frontend build and deloyed') {
+//   jsTask {
+//     docker.build("nguyenvietquoc2569/betaschool-website:${version}", ". -f apps/betaschool/Dockerfile")
+//     sh "docker login -u nguyenvietquoc2569 -p Nvqlovepaq0708/"
+//     sh "docker push nguyenvietquoc2569/betaschool-website:${version}"
+//   }
+// }
+
+// stage('Zip the api and deploy') {
+//   jsTask {
+//     docker.build("nguyenvietquoc2569/betaschool-api:${version}", ". -f apps/api/Dockerfile")
+//     sh "docker login -u nguyenvietquoc2569 -p Nvqlovepaq0708/"
+//     sh "docker push nguyenvietquoc2569/betaschool-api:${version}"
+//   }
+// }
+
+def jsTask(Closure cl) {
+  node {
+    withEnv(["HOME=${workspace}"]) {
+      docker.image('node:19').inside('--tmpfs /.config', cl)
+    }
+  }
+}

@@ -1,0 +1,19 @@
+def distributedTasks = [:]
+def env = 'qa'
+
+stage("Build") {
+  jsTask {
+    checkout scm
+    docker.build("nguyenvietquoc2569/node-beta-tools:latest", ". -f cicd/base/Dockerfile-node-base")
+    sh "docker login -u nguyenvietquoc2569 -p Nvqlovepaq0708/"
+    sh 'docker push nguyenvietquoc2569/node-beta-tools:latest'
+  }
+}
+
+def jsTask(Closure cl) {
+  node {
+    withEnv(["HOME=${workspace}"]) {
+      docker.image('node:19').inside('--tmpfs /.config', cl)
+    }
+  }
+}
