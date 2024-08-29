@@ -93,7 +93,6 @@ export function Index() {
   }
 
   const getComment = async (id: string, token: string) => {
-    //https://graph.facebook.com/v18.0/672455629799336_714236844083895/comments?fields=attachment&limit=500000
     setLoadingComment(true)
     setimgUrl('')
     setComments([])
